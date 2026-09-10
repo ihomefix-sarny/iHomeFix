@@ -74,7 +74,7 @@ function bumpRev(t){ localStorage.setItem("ihomefix_rev_v1", String(t)); }
 function scheduleCloud(){
   if(!sess()?.admin) return;
   clearTimeout(_cloudTimer);
-  _cloudTimer=setTimeout(pushCloud, 800);
+  _cloudTimer=setTimeout(pushCloud, 200);
 }
 function postCloud(obj){
   fetch(CLOUD_INBOX,{method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:JSON.stringify(obj)});
@@ -89,8 +89,8 @@ function pushCloud(){
     const data=ph[id];
     if(data && String(data).indexOf("data:image")===0) postCloud({k:"ihf-photo", t, id, data});
   });
-  const el=document.getElementById("cloudNote");
-  if(el) el.textContent="Збережено. Через 1–2 хв правки з’являться у всіх.";
+  const el=document.getElementById("cloudNote") || document.querySelector(".save-hint");
+  if(el) el.textContent="Збережено локально. Для всіх відвідувачів з’явиться протягом хвилини.";
 }
 async function loadCloud(){
   try{
@@ -99,7 +99,8 @@ async function loadCloud(){
     const j=await r.json();
     if(!j || !j.t) return;
     const localT=rev();
-    const cloudNewer=!localT || j.t>=localT;
+    const admin=!!sess()?.admin;
+    const cloudNewer = j.t > localT;
     if(cloudNewer){
       if(j.prices && typeof j.prices==="object") localStorage.setItem("ihomefix_prices_v4", JSON.stringify(j.prices));
       if(Array.isArray(j.services) && j.services.length) localStorage.setItem("ihomefix_services_v1", JSON.stringify(j.services));
@@ -111,8 +112,9 @@ async function loadCloud(){
       Object.keys(j.photos).forEach(k=>{
         const v=j.photos[k];
         if(!v) return;
-        const keepLocal=String(cur[k]||"").indexOf("data:image")===0 && !cloudNewer;
-        if(!keepLocal && cur[k]!==v){ cur[k]=v; changed=true; }
+        const localData=String(cur[k]||"").indexOf("data:image")===0;
+        if(admin && localData && !cloudNewer) return;
+        if(cur[k]!==v){ cur[k]=v; changed=true; }
       });
       if(changed) localStorage.setItem("ihomefix_photos_v4", JSON.stringify(cur));
     }
@@ -247,26 +249,32 @@ window.commitAdmin=function(){
     draft.prices[id]=draft.prices[id]||{};
     draft.prices[id][k]=Number(el.value)||0;
   });
+  const t=Date.now();
+  bumpRev(t);
   localStorage.setItem("ihomefix_prices_v4", JSON.stringify(draft.prices));
   localStorage.setItem("ihomefix_services_v1", JSON.stringify(draft.services));
   localStorage.setItem("ihomefix_photos_v4", JSON.stringify({...photos(), ...draft.photos}));
   draft=null;
-  scheduleCloud();
+  pushCloud();
   render();
 };
 function saveBar(){
   return `<button class="glow save-admin" style="margin-top:1.5rem;width:100%;border-radius:.8rem;padding:1rem;font-size:1.1rem" type="button" onclick="commitAdmin()">Зберегти</button>
-    <p class="muted save-hint" style="text-align:center;margin-top:.45rem">Зміни застосуються тільки після збереження.</p>`;
+    <p class="muted save-hint" id="cloudNote" style="text-align:center;margin-top:.45rem">Зміни застосуються тільки після збереження.</p>`;
 }
+let adminTab="all";
+window.setAdminTab=function(id){ adminTab=id; ensureDraft(); render(); };
 function adminDesk(){
   if(!sess()?.admin) return "";
-  const ph=viewPhotos();
   const sv=viewServices();
-  return `<section class="admin">
-    <h2>Адмін: фото і ремонти</h2>
-    <p class="muted">Спочатку внеси правки, потім натисни «Зберегти» — лише тоді вони з’являться на сайті.</p>
-    <button class="chip" type="button" style="margin-top:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button>
-    <h3>Види ремонту</h3>
+  const tab=adminTab;
+  const tabs=`<nav class="nav" style="margin-top:1rem">
+    <button class="chip ${tab==="all"?"on":""}" type="button" onclick="setAdminTab('all')">Загальне</button>
+    ${PHONES.map(p=>`<button class="chip ${tab===p.id?"on":""}" type="button" onclick="setAdminTab('${p.id}')">${p.name.replace("iPhone ","")}</button>`).join("")}
+  </nav>`;
+  let body="";
+  if(tab==="all"){
+    body=`<h3>Види ремонту</h3>
     <div class="grid" style="grid-template-columns:1fr 1fr auto;margin-top:.5rem">
       <input id="newSvcT" placeholder="Назва нового ремонту">
       <input id="newSvcD" placeholder="Опис">
@@ -281,11 +289,31 @@ function adminDesk(){
     <div class="grid" style="margin-top:.5rem">
       ${[["hero","Головне фото","phones/hero-bench.jpg"],["sideLeft","Лівий край","phones/side-17pm.png"],["sideRight","Правий край","phones/side-15pm.png"]].map(([id,label,fb])=>`
         <label class="thumb">${label}<img data-ph="${id}" src="${pic(id,fb)}" alt=""><input type="file" accept="image/*" onchange="setPhoto('${id}', this.files[0])"></label>`).join("")}
-    </div>
-    <h3>Фото моделей</h3>
-    <div class="thumbs" style="margin-top:.5rem">
-      ${PHONES.map(p=>`<label class="thumb"><img data-ph="${p.id}" src="${pic(p.id,p.img)}" alt="${p.name}">${p.name}<input type="file" accept="image/*" onchange="setPhoto('${p.id}', this.files[0])"></label>`).join("")}
-    </div>
+    </div>`;
+  } else {
+    const p=PHONES.find(x=>x.id===tab);
+    const pr=viewPrices()[p.id]||{};
+    body=`<h3>${p.name}</h3>
+      <p class="muted">Фото моделі і ціни саме для цього iPhone.</p>
+      <label class="thumb" style="max-width:16rem;margin-top:.75rem">
+        <img data-ph="${p.id}" src="${pic(p.id,p.img)}" alt="${p.name}">
+        Змінити фото
+        <input type="file" accept="image/*" onchange="setPhoto('${p.id}', this.files[0])">
+      </label>
+      <div class="grid" style="grid-template-columns:1fr;margin-top:1rem">
+        ${sv.map(x=>`<article class="box">
+          <p style="font-weight:800">${esc(x.t)}</p>
+          <p class="muted" style="font-size:.85rem">${esc(x.d||"")}</p>
+          <input type="number" data-price="${x.k}" data-phone="${p.id}" style="margin-top:.6rem;font-size:1.3rem;font-weight:800;color:var(--bright)" value="${pr[x.k]||0}" oninput="updPrice('${p.id}','${x.k}',this.value)">
+        </article>`).join("")}
+      </div>`;
+  }
+  return `<section class="admin">
+    <h2>Адмін: фото і ремонти</h2>
+    <p class="muted">Обери модель вкладкою, зміни ціну або фото, потім натисни «Зберегти».</p>
+    <button class="chip" type="button" style="margin-top:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button>
+    ${tabs}
+    ${body}
     ${saveBar()}
   </section>`;
 }

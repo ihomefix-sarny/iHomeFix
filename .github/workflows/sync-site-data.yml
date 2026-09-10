@@ -1,7 +1,7 @@
 name: Publish iHomeFix site data
 on:
   schedule:
-    - cron: "*/2 * * * *"
+    - cron: "* * * * *"
   workflow_dispatch:
   repository_dispatch:
     types: [ihomefix-save]
@@ -12,12 +12,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Pull admin payload and write data
-        env:
-          DISPATCH_JSON: ${{ toJson(github.event.client_payload) }}
+      - name: Fetch admin inbox
+        run: |
+          curl -fsSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36" \
+            "https://webhook.site/token/b611e6b3-9950-432a-a641-d343f437667d/requests?sorting=newest&per_page=40" \
+            -o /tmp/inbox.json || echo '{"data":[]}' > /tmp/inbox.json
+          python3 - << 'PY'
+          import json, time
+          b=json.load(open("/tmp/inbox.json"))
+          print("inbox rows", len(b.get("data") or []), "now", int(time.time()*1000))
+          PY
+      - name: Write data.json and photos
         run: |
           python3 << 'PY'
-          import json, os, urllib.request, pathlib, base64, re
+          import json, os, pathlib, base64, re, time
           dest = pathlib.Path("docs/data.json")
           uploads = pathlib.Path("docs/uploads")
           uploads.mkdir(parents=True, exist_ok=True)
@@ -28,28 +36,25 @@ jobs:
           current.setdefault("photos", {})
           current.setdefault("prices", {})
           current.setdefault("services", [])
+          now_ms = int(time.time() * 1000) + 180000
           items = []
-          raw = os.environ.get("DISPATCH_JSON") or ""
           try:
-              d = json.loads(raw)
-              if isinstance(d, dict) and d.get("k"):
-                  items.append(d)
-          except Exception:
-              pass
-          url = "https://webhook.site/token/b611e6b3-9950-432a-a641-d343f437667d/requests?sorting=newest&per_page=25"
-          try:
-              with urllib.request.urlopen(url, timeout=30) as r:
-                  body = json.loads(r.read().decode())
+              body = json.loads(pathlib.Path("/tmp/inbox.json").read_text())
               for row in body.get("data") or []:
                   try:
                       d = json.loads(row.get("content") or "")
                   except Exception:
                       continue
                   if isinstance(d, dict) and d.get("k") in ("ihf", "ihf-photo"):
-                      items.append(d)
+                      t = int(d.get("t") or 0)
+                      if 0 < t <= now_ms:
+                          items.append(d)
           except Exception as e:
-              print("inbox error", e)
-          changed = False
+              print("inbox parse", e)
+          print("valid items", len(items))
+          if not items:
+              print("no payload")
+              raise SystemExit(0)
           def save_data_url(pid, data):
               if not isinstance(data, str) or not data.startswith("data:image"):
                   return None
@@ -62,39 +67,47 @@ jobs:
               safe = re.sub(r"[^a-zA-Z0-9_-]", "", str(pid)) or "img"
               path = uploads / f"{safe}.{ext}"
               path.write_bytes(rawb)
-              return f"uploads/{safe}.{ext}?v={os.path.getmtime(path):.0f}"
-          latest_t = int(current.get("t") or 0)
-          for d in reversed(items):
-              t = int(d.get("t") or 0)
-              if d.get("k") == "ihf" and t >= latest_t:
-                  if d.get("prices"):
-                      current["prices"] = d["prices"]
-                      changed = True
+              return f"uploads/{safe}.{ext}?v={int(path.stat().st_mtime)}"
+          changed = False
+          ihfs = [d for d in items if d.get("k") == "ihf" and d.get("prices")]
+          ihfs.sort(key=lambda d: int(d.get("t") or 0), reverse=True)
+          if ihfs:
+              d = ihfs[0]
+              t = int(d["t"])
+              if t >= int(current.get("t") or 0):
+                  current["prices"] = d["prices"]
                   if isinstance(d.get("services"), list) and d["services"]:
                       current["services"] = d["services"]
+                  current["t"] = t
+                  changed = True
+                  print("applied prices t", t)
+          latest_photo = {}
+          for d in items:
+              if d.get("k") != "ihf-photo":
+                  continue
+              pid, val, t = d.get("id"), d.get("data"), int(d.get("t") or 0)
+              if not pid or not val:
+                  continue
+              prev = latest_photo.get(pid)
+              if not prev or t >= prev[0]:
+                  latest_photo[pid] = (t, val)
+          for pid, (t, val) in latest_photo.items():
+              rel = save_data_url(pid, val)
+              if rel:
+                  current["photos"][pid] = rel
+                  current["t"] = max(int(current.get("t") or 0), t)
+                  changed = True
+                  print("photo", pid, rel)
+          # never keep giant data-URLs in data.json
+          for pid, val in list(current["photos"].items()):
+              if isinstance(val, str) and val.startswith("data:image"):
+                  rel = save_data_url(pid, val)
+                  if rel:
+                      current["photos"][pid] = rel
                       changed = True
-                  latest_t = max(latest_t, t)
-              if d.get("k") in ("ihf", "ihf-photo"):
-                  photos = d.get("photos") if d.get("k") == "ihf" else None
-                  if d.get("k") == "ihf-photo" and d.get("id") and d.get("data"):
-                      photos = {d["id"]: d["data"]}
-                  if isinstance(photos, dict):
-                      for pid, val in photos.items():
-                          if not val:
-                              continue
-                          if isinstance(val, str) and val.startswith("data:image"):
-                              rel = save_data_url(pid, val)
-                              if rel:
-                                  current["photos"][pid] = rel
-                                  changed = True
-                                  latest_t = max(latest_t, t)
-                          elif isinstance(val, str):
-                              current["photos"][pid] = val
-                              changed = True
           if not changed:
               print("no change")
               raise SystemExit(0)
-          current["t"] = latest_t
           dest.write_text(json.dumps(current, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
           print("wrote", dest, "t=", current["t"], "photos", list(current["photos"]))
           PY
