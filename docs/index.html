@@ -80,7 +80,14 @@
     .admin-dot:hover { color:#6cff9a }
     body.admin-win .side, body.admin-win canvas.rain, body.admin-win .bar { display:none !important }
     body.admin-win .shell { border:0; max-width:28rem }
-    @media (max-width:1023px) { .side, canvas.rain { display:none } }
+    .totop {
+      position:fixed; left:50%; bottom:1.2rem; z-index:50; width:3.4rem; height:3.4rem; margin:0;
+      transform:translateX(-50%); border-radius:999px; border:1px solid var(--bright);
+      background:var(--primary); color:var(--fg); font-size:1.5rem; cursor:pointer;
+      box-shadow:0 0 22px rgb(29 185 84 / .5); opacity:0; pointer-events:none;
+    }
+    .totop.show { opacity:1; pointer-events:auto }
+    body.admin-win .totop { display:none }
     @media (prefers-reduced-motion:reduce) { .side img, .glow { animation:none } }
   </style>
 </head>
@@ -102,7 +109,8 @@
   </div>
 </header>
 <div class="shell"><div id="app"></div></div>
-<script src="app.js?v=7"></script>
+<button class="totop" id="toTop" type="button" aria-label="Наверх">↑</button>
+<script src="app.js?v=8"></script>
 
 </body>
 </html>

@@ -65,8 +65,7 @@ function canon(raw){ let d=String(raw).replace(/\D/g,""); if(d.startsWith("380")
 function load(k, fb){ try { return JSON.parse(localStorage.getItem(k)||"null") ?? fb } catch { return fb } }
 function save(k,v){
   localStorage.setItem(k, JSON.stringify(v));
-  if(k==="ihomefix_prices_v4"||k==="ihomefix_services_v1"||k==="ihomefix_photos_v4") scheduleCloud();
-  render();
+  if(k==="ihomefix_sess_v4"){ if(!v) draft=null; render(); }
 }
 const CLOUD_INBOX="https://webhook.site/b611e6b3-9950-432a-a641-d343f437667d";
 let _cloudTimer=null;
@@ -122,7 +121,6 @@ async function loadCloud(){
 function prices(){ const raw=load("ihomefix_prices_v4",{}); const out={}; for (const p of PHONES) out[p.id]={...(DEFAULT_PRICES[p.id]||{}), ...(raw[p.id]||{})}; return out; }
 function services(){ return load("ihomefix_services_v1", SERVICES); }
 function photos(){ return load("ihomefix_photos_v4", {}); }
-function pic(id, fallback){ return photos()[id] || fallback; }
 function sess(){ return load("ihomefix_sess_v4", null); }
 function users(){ return load("ihomefix_users_v4", {}); }
 function loginAdmin(phone, pass){
@@ -182,34 +180,91 @@ function compress(file, cb){
 }
 window.setPhoto=function(id, file){
   if(!file || !sess()?.admin) return;
-  compress(file, data=>{ const next={...photos(), [id]:data}; save("ihomefix_photos_v4", next); });
+  ensureDraft();
+  compress(file, data=>{
+    ensureDraft();
+    draft.photos[id]=data;
+    document.querySelectorAll('[data-ph="'+id+'"]').forEach(img=>{ img.src=data; });
+    dirtyNote();
+  });
 };
 window.renSvc=function(k, field, val){
   if(!sess()?.admin) return;
-  save("ihomefix_services_v1", services().map(x=>x.k===k?{...x,[field]:val}:x));
+  ensureDraft();
+  draft.services=draft.services.map(x=>x.k===k?{...x,[field]:val}:x);
+  dirtyNote();
 };
 window.delSvc=function(k){
   if(!sess()?.admin) return;
-  save("ihomefix_services_v1", services().filter(x=>x.k!==k));
+  ensureDraft();
+  draft.services=draft.services.filter(x=>x.k!==k);
+  render();
 };
 window.addSvc=function(){
   if(!sess()?.admin) return;
   const t=document.getElementById("newSvcT")?.value.trim();
   const d=document.getElementById("newSvcD")?.value.trim()||"";
   if(!t) return;
-  save("ihomefix_services_v1", [...services(), {k:"s"+Date.now(), t, d}]);
+  ensureDraft();
+  draft.services=[...draft.services, {k:"s"+Date.now(), t, d}];
+  render();
 };
 window.updPrice=function(id,k,v){
   if(!sess()?.admin) return;
-  const p=prices(); p[id]={...p[id],[k]:Number(v)||0}; save("ihomefix_prices_v4", p);
+  ensureDraft();
+  draft.prices[id]={...(draft.prices[id]||{}), [k]:Number(v)||0};
+  dirtyNote();
 };
+let draft=null;
+function ensureDraft(){
+  if(!sess()?.admin) return;
+  if(!draft) draft={ prices:JSON.parse(JSON.stringify(prices())), services:JSON.parse(JSON.stringify(services())), photos:{...photos()} };
+}
+function viewServices(){ return (sess()?.admin && draft) ? draft.services : services(); }
+function viewPrices(){ return (sess()?.admin && draft) ? draft.prices : prices(); }
+function viewPhotos(){ return (sess()?.admin && draft) ? {...photos(), ...draft.photos} : photos(); }
+function pic(id, fallback){ return viewPhotos()[id] || fallback; }
+function dirtyNote(){
+  document.querySelectorAll(".save-admin").forEach(b=>{
+    b.textContent="Зберегти зміни";
+  });
+  document.querySelectorAll(".save-hint").forEach(p=>{
+    p.textContent="Є незбережені правки.";
+  });
+}
+window.commitAdmin=function(){
+  if(!sess()?.admin) return;
+  ensureDraft();
+  document.querySelectorAll("[data-svc]").forEach(el=>{
+    const k=el.getAttribute("data-svc");
+    const field=el.getAttribute("data-field");
+    const s=draft.services.find(x=>x.k===k);
+    if(s) s[field]=el.value;
+  });
+  document.querySelectorAll("[data-price]").forEach(el=>{
+    const id=el.getAttribute("data-phone");
+    const k=el.getAttribute("data-price");
+    draft.prices[id]=draft.prices[id]||{};
+    draft.prices[id][k]=Number(el.value)||0;
+  });
+  localStorage.setItem("ihomefix_prices_v4", JSON.stringify(draft.prices));
+  localStorage.setItem("ihomefix_services_v1", JSON.stringify(draft.services));
+  localStorage.setItem("ihomefix_photos_v4", JSON.stringify({...photos(), ...draft.photos}));
+  draft=null;
+  scheduleCloud();
+  render();
+};
+function saveBar(){
+  return `<button class="glow save-admin" style="margin-top:1.5rem;width:100%;border-radius:.8rem;padding:1rem;font-size:1.1rem" type="button" onclick="commitAdmin()">Зберегти</button>
+    <p class="muted save-hint" style="text-align:center;margin-top:.45rem">Зміни застосуються тільки після збереження.</p>`;
+}
 function adminDesk(){
   if(!sess()?.admin) return "";
-  const ph=photos();
-  const sv=services();
+  const ph=viewPhotos();
+  const sv=viewServices();
   return `<section class="admin">
     <h2>Адмін: фото і ремонти</h2>
-    <p class="muted">Правки бачать усі відвідувачі сайту. Звичайні користувачі редагувати не можуть.</p>
+    <p class="muted">Спочатку внеси правки, потім натисни «Зберегти» — лише тоді вони з’являться на сайті.</p>
     <button class="chip" type="button" style="margin-top:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button>
     <h3>Види ремонту</h3>
     <div class="grid" style="grid-template-columns:1fr 1fr auto;margin-top:.5rem">
@@ -218,19 +273,20 @@ function adminDesk(){
       <button class="glow" type="button" style="border-radius:.6rem;padding:.6rem 1rem" onclick="addSvc()">Додати</button>
     </div>
     ${sv.map(s=>`<div class="grid" style="grid-template-columns:1fr 1fr auto;margin-top:.4rem">
-      <input value="${esc(s.t)}" onchange="renSvc('${s.k}','t',this.value)">
-      <input value="${esc(s.d)}" onchange="renSvc('${s.k}','d',this.value)">
+      <input data-svc="${s.k}" data-field="t" value="${esc(s.t)}" oninput="renSvc('${s.k}','t',this.value)">
+      <input data-svc="${s.k}" data-field="d" value="${esc(s.d)}" oninput="renSvc('${s.k}','d',this.value)">
       <button class="chip" type="button" onclick="delSvc('${s.k}')">Видалити</button>
     </div>`).join("")}
     <h3>Загальні фото</h3>
     <div class="grid" style="margin-top:.5rem">
       ${[["hero","Головне фото","phones/hero-bench.jpg"],["sideLeft","Лівий край","phones/side-17pm.png"],["sideRight","Правий край","phones/side-15pm.png"]].map(([id,label,fb])=>`
-        <label class="thumb">${label}<img src="${pic(id,fb)}" alt=""><input type="file" accept="image/*" onchange="setPhoto('${id}', this.files[0])"></label>`).join("")}
+        <label class="thumb">${label}<img data-ph="${id}" src="${pic(id,fb)}" alt=""><input type="file" accept="image/*" onchange="setPhoto('${id}', this.files[0])"></label>`).join("")}
     </div>
     <h3>Фото моделей</h3>
     <div class="thumbs" style="margin-top:.5rem">
-      ${PHONES.map(p=>`<label class="thumb"><img src="${pic(p.id,p.img)}" alt="${p.name}">${p.name}<input type="file" accept="image/*" onchange="setPhoto('${p.id}', this.files[0])"></label>`).join("")}
+      ${PHONES.map(p=>`<label class="thumb"><img data-ph="${p.id}" src="${pic(p.id,p.img)}" alt="${p.name}">${p.name}<input type="file" accept="image/*" onchange="setPhoto('${p.id}', this.files[0])"></label>`).join("")}
     </div>
+    ${saveBar()}
   </section>`;
 }
 function footer(){
@@ -278,13 +334,13 @@ function home(){
 }
 function model(id){
   const p=PHONES.find(x=>x.id===id); if(!p) return home();
-  const admin=!!sess()?.admin; const pr=prices()[id]||{}; const sv=services();
+  const admin=!!sess()?.admin; const pr=viewPrices()[id]||{}; const sv=viewServices();
   return `<main>
     <a href="#/" style="color:var(--bright);font-weight:700">← усі моделі</a>
     <nav class="nav">${PHONES.map(x=>`<a class="chip ${x.id===id?"on":""}" href="#/m/${x.id}">${x.name.replace("iPhone ","")}</a>`).join("")}</nav>
     <section class="hero">
       <div class="stage">
-        <img src="${pic(p.id,p.img)}" alt="${p.name}" style="height:24rem;width:100%;object-fit:contain">
+        <img data-ph="${p.id}" src="${pic(p.id,p.img)}" alt="${p.name}" style="height:24rem;width:100%;object-fit:contain">
         ${admin?`<label class="chip" style="display:inline-block;margin:.6rem">Змінити фото<input type="file" accept="image/*" style="display:block;margin-top:.3rem" onchange="setPhoto('${p.id}', this.files[0])"></label>`:""}
       </div>
       <div>
@@ -304,21 +360,23 @@ function model(id){
       </div>`:""}
       <div class="grid" style="grid-template-columns:1fr;margin-top:1rem">
         ${sv.map(x=>`<article class="box">
-          ${admin?`<input value="${esc(x.t)}" onchange="renSvc('${x.k}','t',this.value)">`:`<h3>${x.t}</h3>`}
-          ${admin?`<input style="margin-top:.4rem" value="${esc(x.d)}" onchange="renSvc('${x.k}','d',this.value)">`:`<p class="muted" style="font-size:.9rem">${x.d||""}</p>`}
-          ${admin?`<input type="number" style="margin-top:.6rem" value="${pr[x.k]||0}" onchange="updPrice('${id}','${x.k}',this.value)">`:`<p class="price">${money(pr[x.k])}</p>`}
+          ${admin?`<input data-svc="${x.k}" data-field="t" value="${esc(x.t)}" oninput="renSvc('${x.k}','t',this.value)">`:`<h3>${x.t}</h3>`}
+          ${admin?`<input data-svc="${x.k}" data-field="d" style="margin-top:.4rem" value="${esc(x.d)}" oninput="renSvc('${x.k}','d',this.value)">`:`<p class="muted" style="font-size:.9rem">${x.d||""}</p>`}
+          ${admin?`<input type="number" data-price="${x.k}" data-phone="${id}" style="margin-top:.6rem" value="${pr[x.k]||0}" oninput="updPrice('${id}','${x.k}',this.value)">`:`<p class="price">${money(pr[x.k])}</p>`}
           ${admin?`<button class="chip" style="margin-top:.5rem" onclick="delSvc('${x.k}')">Видалити цей ремонт</button>`:""}
         </article>`).join("")}
       </div>
+      ${admin?saveBar():""}
     </section>
   </main>`+footer();
 }
-function render(){
+function render(opts){
   try {
     const h=location.hash.slice(1) || "/";
     if(h==="/admin" || h.startsWith("/admin")){
       document.body.classList.add("admin-win");
       document.getElementById("app").innerHTML = adminGate();
+      if(opts && opts.top) window.scrollTo(0,0);
       return;
     }
     document.body.classList.remove("admin-win");
@@ -328,14 +386,26 @@ function render(){
     const Rimg=document.getElementById("sideR");
     if(L) L.src=pic("sideLeft","phones/side-17pm.png");
     if(Rimg) Rimg.src=pic("sideRight","phones/side-15pm.png");
+    if(opts && opts.top) window.scrollTo(0,0);
+    syncTopBtn();
   } catch (err) {
     document.getElementById("app").innerHTML = "<main><p class=err>Помилка завантаження. Оновіть сторінку.</p></main>";
     console.error(err);
   }
 }
-window.addEventListener("hashchange", render);
+function syncTopBtn(){
+  const b=document.getElementById("toTop");
+  if(!b) return;
+  const max=document.documentElement.scrollHeight-window.innerHeight;
+  const near=max>80 && window.scrollY>=max-80;
+  b.classList.toggle("show", near && !document.body.classList.contains("admin-win"));
+}
+document.getElementById("toTop")?.addEventListener("click", ()=>window.scrollTo(0,0));
+window.addEventListener("scroll", syncTopBtn, {passive:true});
+window.addEventListener("resize", syncTopBtn);
+window.addEventListener("hashchange", ()=>render({top:true}));
 window.addEventListener("storage", ()=>render());
-loadCloud().finally(render);
+loadCloud().finally(()=>render({top:true}));
 setInterval(()=>{ if(!sess()?.admin) loadCloud().then(()=>render()); }, 20000);
 (function rain(){
   const c=document.getElementById("rain"); if(!c) return; const ctx=c.getContext("2d");
