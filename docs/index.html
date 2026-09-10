@@ -26,10 +26,11 @@
     .ico svg { width:1.15rem; height:1.15rem; display:block }
     .row { display:flex; gap:.4rem; align-items:center }
     canvas.rain { position:fixed; inset:0; z-index:10; pointer-events:none }
-    .side { position:fixed; top:6rem; z-index:11; width:13rem; background:transparent; pointer-events:none }
+    .side { position:fixed; top:6rem; z-index:11; width:13rem; background:transparent; pointer-events:none; overflow:visible }
     .side img {
       height:70vh; width:auto; max-width:13rem; object-fit:contain; background:transparent;
-      mix-blend-mode:lighten; animation:breathe 4.8s ease-in-out infinite;
+      mix-blend-mode:normal; filter:drop-shadow(0 18px 24px rgb(0 0 0 / .35));
+      animation:breathe 4.8s ease-in-out infinite;
     }
     .left { left:0 } .right { right:0 }
     .left img { transform-origin:left center; object-position:left }
@@ -78,8 +79,8 @@
 </head>
 <body>
 <canvas class="rain" id="rain"></canvas>
-<aside class="side left"><img id="sideL" src="phones/17pm.jpg" alt="iPhone 17 Pro Max"></aside>
-<aside class="side right"><img id="sideR" src="phones/15pm.jpg" alt="iPhone 15 Pro Max"></aside>
+<aside class="side left"><img id="sideL" src="phones/17pm.png" alt="iPhone 17 Pro Max"></aside>
+<aside class="side right"><img id="sideR" src="phones/15pm.png" alt="iPhone 15 Pro Max"></aside>
 <header class="bar">
   <div class="bar-in">
     <div class="row">

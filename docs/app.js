@@ -183,7 +183,7 @@ function adminDesk(){
     </div>`).join("")}
     <h3>Загальні фото</h3>
     <div class="grid" style="margin-top:.5rem">
-      ${[["hero","Головне фото","phones/hero-bench.jpg"],["sideLeft","Лівий край","phones/17pm.jpg"],["sideRight","Правий край","phones/15pm.jpg"]].map(([id,label,fb])=>`
+      ${[["hero","Головне фото","phones/hero-bench.jpg"],["sideLeft","Лівий край","phones/17pm.png"],["sideRight","Правий край","phones/15pm.png"]].map(([id,label,fb])=>`
         <label class="thumb">${label}<img src="${pic(id,fb)}" alt=""><input type="file" accept="image/*" onchange="setPhoto('${id}', this.files[0])"></label>`).join("")}
     </div>
     <h3>Фото моделей</h3>
@@ -281,8 +281,8 @@ function render(){
     document.getElementById("app").innerHTML = m ? model(m[1]) : home();
     const L=document.getElementById("sideL");
     const Rimg=document.getElementById("sideR");
-    if(L) L.src=pic("sideLeft","phones/17pm.jpg");
-    if(Rimg) Rimg.src=pic("sideRight","phones/15pm.jpg");
+    if(L) L.src=pic("sideLeft","phones/17pm.png");
+    if(Rimg) Rimg.src=pic("sideRight","phones/15pm.png");
   } catch (err) {
     document.getElementById("app").innerHTML = "<main><p class=err>Помилка завантаження. Оновіть сторінку.</p></main>";
     console.error(err);
