@@ -2,7 +2,7 @@
 
 Ремонт телефонів, планшетів і ноутбуків у Сарнах.
 
-**Сайт:** https://mikhailoyakovets.github.io/iHomeFix/
+**Сайт:** https://ihomefix-sarny.github.io/iHomeFix/
 
 Адреса: м. Сарни, вул. Княгині Ольги, 40  
 Телефон: 067 866 10 83
