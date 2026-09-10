@@ -70,22 +70,28 @@ function save(k,v){
 }
 const CLOUD_INBOX="https://webhook.site/b611e6b3-9950-432a-a641-d343f437667d";
 let _cloudTimer=null;
+function rev(){ return Number(localStorage.getItem("ihomefix_rev_v1")||0); }
+function bumpRev(t){ localStorage.setItem("ihomefix_rev_v1", String(t)); }
 function scheduleCloud(){
   if(!sess()?.admin) return;
   clearTimeout(_cloudTimer);
-  _cloudTimer=setTimeout(pushCloud, 700);
+  _cloudTimer=setTimeout(pushCloud, 800);
+}
+function postCloud(obj){
+  fetch(CLOUD_INBOX,{method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body:JSON.stringify(obj)});
 }
 function pushCloud(){
   if(!sess()?.admin) return;
-  const payload={k:"ihf", t:Date.now(), prices:prices(), services:services(), photos:photos()};
-  let body=JSON.stringify(payload);
-  if(body.length>220000){
-    payload.photos={};
-    body=JSON.stringify(payload);
-  }
-  fetch(CLOUD_INBOX,{method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body});
+  const t=Date.now();
+  bumpRev(t);
+  postCloud({k:"ihf", t, prices:prices(), services:services()});
+  const ph=photos();
+  Object.keys(ph).forEach(id=>{
+    const data=ph[id];
+    if(data && String(data).indexOf("data:image")===0) postCloud({k:"ihf-photo", t, id, data});
+  });
   const el=document.getElementById("cloudNote");
-  if(el) el.textContent="Збережено. Через 1–2 хв усі відвідувачі побачать правки.";
+  if(el) el.textContent="Збережено. Через 1–2 хв правки з’являться у всіх.";
 }
 async function loadCloud(){
   try{
@@ -93,9 +99,24 @@ async function loadCloud(){
     if(!r.ok) return;
     const j=await r.json();
     if(!j || !j.t) return;
-    if(j.prices && typeof j.prices==="object") localStorage.setItem("ihomefix_prices_v4", JSON.stringify(j.prices));
-    if(Array.isArray(j.services) && j.services.length) localStorage.setItem("ihomefix_services_v1", JSON.stringify(j.services));
-    if(j.photos && typeof j.photos==="object") localStorage.setItem("ihomefix_photos_v4", JSON.stringify(j.photos));
+    const localT=rev();
+    const cloudNewer=!localT || j.t>=localT;
+    if(cloudNewer){
+      if(j.prices && typeof j.prices==="object") localStorage.setItem("ihomefix_prices_v4", JSON.stringify(j.prices));
+      if(Array.isArray(j.services) && j.services.length) localStorage.setItem("ihomefix_services_v1", JSON.stringify(j.services));
+      bumpRev(j.t);
+    }
+    if(j.photos && typeof j.photos==="object"){
+      const cur=load("ihomefix_photos_v4",{});
+      let changed=false;
+      Object.keys(j.photos).forEach(k=>{
+        const v=j.photos[k];
+        if(!v) return;
+        const keepLocal=String(cur[k]||"").indexOf("data:image")===0 && !cloudNewer;
+        if(!keepLocal && cur[k]!==v){ cur[k]=v; changed=true; }
+      });
+      if(changed) localStorage.setItem("ihomefix_photos_v4", JSON.stringify(cur));
+    }
   }catch(e){}
 }
 function prices(){ const raw=load("ihomefix_prices_v4",{}); const out={}; for (const p of PHONES) out[p.id]={...(DEFAULT_PRICES[p.id]||{}), ...(raw[p.id]||{})}; return out; }
@@ -113,8 +134,7 @@ function loginAdmin(phone, pass){
 window.openAdmin=function(){
   const u=new URL(location.href);
   u.hash="#/admin";
-  const w=window.open(u.toString(),"ihomefix-admin","popup=yes,width=440,height=640,scrollbars=yes,resizable=yes");
-  if(!w) location.hash="#/admin";
+  window.open(u.toString(), "_blank", "noopener");
 };
 window.adminSubmit=function(e){
   e.preventDefault();
@@ -216,7 +236,7 @@ function adminDesk(){
 function footer(){
   return `<footer><div class="foot">
     <div><p style="font-family:Syne;font-weight:800;font-size:1.2rem;margin:0">iHome Fix</p>
-    <p class="muted" style="margin:.25rem 0 0">Сарни, вул. Княгині Ольги, 40</p>
+    <p class="muted" style="margin:.25rem 0 0">Сарни, вул. Княгині Ольги, 40<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора">.</button></p>
     <a href="tel:+380678661083" style="color:var(--bright);font-weight:800">067 866 10 83</a></div>
     <div class="row" style="flex-wrap:wrap">
       <a class="glow" href="https://instagram.com/ihome_fix" target="_blank" rel="noreferrer">Instagram</a>
@@ -252,7 +272,7 @@ function home(){
         <iframe title="Карта iHomeFix" style="height:20rem;width:100%;border:0" loading="lazy"
           src="https://maps.google.com/maps?q=%D0%A1%D0%B0%D1%80%D0%BD%D0%B8%20%D0%B2%D1%83%D0%BB.%20%D0%9A%D0%BD%D1%8F%D0%B3%D0%B8%D0%BD%D1%96%20%D0%9E%D0%BB%D1%8C%D0%B3%D0%B8%2040&hl=uk&z=17&output=embed"></iframe>
       </div>
-      <p class="muted" style="margin-top:.75rem">м. Сарни, вул. Княгині Ольги, 40<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора"></button></p>
+      <p class="muted" style="margin-top:.75rem">м. Сарни, вул. Княгині Ольги, 40<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора">.</button></p>
     </section>
   </main>`+footer();
 }

@@ -73,11 +73,11 @@
     .thumb { border:1px solid var(--line); border-radius:.6rem; padding:.5rem; font-size:.75rem; cursor:pointer }
     .thumb img { height:5.5rem; width:100%; object-fit:contain; background:transparent }
     .admin-dot {
-      display:inline-block; width:.42rem; height:.42rem; margin:0 0 1px 3px; padding:0; border:0;
-      border-radius:999px; background:var(--bright); vertical-align:baseline; cursor:pointer;
-      box-shadow:0 0 8px rgb(29 185 84 / .95);
+      display:inline; margin:0; padding:0 1px 0 2px; border:0; background:transparent;
+      color:var(--bright); font-size:1.45rem; font-weight:900; line-height:.6; cursor:pointer;
+      text-shadow:0 0 10px rgb(29 185 84 / .95); vertical-align:baseline;
     }
-    .admin-dot:hover { transform:scale(1.3) }
+    .admin-dot:hover { color:#6cff9a }
     body.admin-win .side, body.admin-win canvas.rain, body.admin-win .bar { display:none !important }
     body.admin-win .shell { border:0; max-width:28rem }
     @media (max-width:1023px) { .side, canvas.rain { display:none } }
@@ -102,7 +102,7 @@
   </div>
 </header>
 <div class="shell"><div id="app"></div></div>
-<script src="app.js"></script>
+<script src="app.js?v=7"></script>
 
 </body>
 </html>

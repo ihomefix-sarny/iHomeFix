@@ -12,57 +12,97 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Pull admin payload and write data.json
+      - name: Pull admin payload and write data
         env:
           DISPATCH_JSON: ${{ toJson(github.event.client_payload) }}
         run: |
           python3 << 'PY'
-          import json, os, urllib.request, pathlib
+          import json, os, urllib.request, pathlib, base64, re
           dest = pathlib.Path("docs/data.json")
-          payload = None
-          raw = os.environ.get("DISPATCH_JSON") or ""
-          try:
-              d = json.loads(raw)
-              if isinstance(d, dict) and d.get("t") and (d.get("prices") or d.get("services")):
-                  payload = d
-          except Exception:
-              pass
-          if payload is None:
-              url = "https://webhook.site/token/b611e6b3-9950-432a-a641-d343f437667d/requests?sorting=newest&per_page=5"
-              try:
-                  with urllib.request.urlopen(url, timeout=30) as r:
-                      body = json.loads(r.read().decode())
-                  rows = body.get("data") or []
-                  for row in rows:
-                      content = row.get("content") or ""
-                      try:
-                          d = json.loads(content)
-                      except Exception:
-                          continue
-                      if isinstance(d, dict) and d.get("k") == "ihf" and d.get("t"):
-                          payload = d
-                          break
-              except Exception as e:
-                  print("inbox error", e)
-          if not payload:
-              print("no payload")
-              raise SystemExit(0)
-          payload.pop("k", None)
+          uploads = pathlib.Path("docs/uploads")
+          uploads.mkdir(parents=True, exist_ok=True)
           try:
               current = json.loads(dest.read_text())
           except Exception:
-              current = {"t": 0}
-          if int(payload.get("t") or 0) <= int(current.get("t") or 0):
-              print("stale", payload.get("t"), current.get("t"))
+              current = {"t": 0, "prices": {}, "services": [], "photos": {}}
+          current.setdefault("photos", {})
+          current.setdefault("prices", {})
+          current.setdefault("services", [])
+          items = []
+          raw = os.environ.get("DISPATCH_JSON") or ""
+          try:
+              d = json.loads(raw)
+              if isinstance(d, dict) and d.get("k"):
+                  items.append(d)
+          except Exception:
+              pass
+          url = "https://webhook.site/token/b611e6b3-9950-432a-a641-d343f437667d/requests?sorting=newest&per_page=25"
+          try:
+              with urllib.request.urlopen(url, timeout=30) as r:
+                  body = json.loads(r.read().decode())
+              for row in body.get("data") or []:
+                  try:
+                      d = json.loads(row.get("content") or "")
+                  except Exception:
+                      continue
+                  if isinstance(d, dict) and d.get("k") in ("ihf", "ihf-photo"):
+                      items.append(d)
+          except Exception as e:
+              print("inbox error", e)
+          changed = False
+          def save_data_url(pid, data):
+              if not isinstance(data, str) or not data.startswith("data:image"):
+                  return None
+              try:
+                  header, b64 = data.split(",", 1)
+              except ValueError:
+                  return None
+              ext = "png" if "png" in header else "jpg"
+              rawb = base64.b64decode(b64)
+              safe = re.sub(r"[^a-zA-Z0-9_-]", "", str(pid)) or "img"
+              path = uploads / f"{safe}.{ext}"
+              path.write_bytes(rawb)
+              return f"uploads/{safe}.{ext}?v={os.path.getmtime(path):.0f}"
+          latest_t = int(current.get("t") or 0)
+          for d in reversed(items):
+              t = int(d.get("t") or 0)
+              if d.get("k") == "ihf" and t >= latest_t:
+                  if d.get("prices"):
+                      current["prices"] = d["prices"]
+                      changed = True
+                  if isinstance(d.get("services"), list) and d["services"]:
+                      current["services"] = d["services"]
+                      changed = True
+                  latest_t = max(latest_t, t)
+              if d.get("k") in ("ihf", "ihf-photo"):
+                  photos = d.get("photos") if d.get("k") == "ihf" else None
+                  if d.get("k") == "ihf-photo" and d.get("id") and d.get("data"):
+                      photos = {d["id"]: d["data"]}
+                  if isinstance(photos, dict):
+                      for pid, val in photos.items():
+                          if not val:
+                              continue
+                          if isinstance(val, str) and val.startswith("data:image"):
+                              rel = save_data_url(pid, val)
+                              if rel:
+                                  current["photos"][pid] = rel
+                                  changed = True
+                                  latest_t = max(latest_t, t)
+                          elif isinstance(val, str):
+                              current["photos"][pid] = val
+                              changed = True
+          if not changed:
+              print("no change")
               raise SystemExit(0)
-          dest.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-          print("wrote", dest, "t=", payload.get("t"), "bytes", dest.stat().st_size)
+          current["t"] = latest_t
+          dest.write_text(json.dumps(current, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+          print("wrote", dest, "t=", current["t"], "photos", list(current["photos"]))
           PY
       - name: Commit published data
         run: |
           git config user.name "iHomeFix"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/data.json
+          git add docs/data.json docs/uploads
           git diff --cached --quiet && echo "no change" && exit 0
           git commit -m "Publish live site data"
           git push
