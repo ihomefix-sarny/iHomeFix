@@ -345,7 +345,6 @@ function home(){
     ${adminDesk()}
     <section style="margin-top:3rem">
       <h2 style="font-size:1.8rem">Моделі iPhone</h2>
-      <p class="muted">Окрема вкладка для кожної моделі — фото ззаду і прайс саме для неї.</p>
       <div class="grid" style="margin-top:1.25rem">
         ${PHONES.map(p=>`<a class="ph" href="#/m/${p.id}"><div class="stage"><img src="${pic(p.id,p.img)}" alt="${p.name}"></div><div class="pad"><p style="font-weight:800">${p.name}</p><p class="muted" style="font-size:.75rem">${p.color} · ${p.year}</p></div></a>`).join("")}
       </div>
