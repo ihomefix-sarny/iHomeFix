@@ -63,7 +63,41 @@ function esc(s){
 const money = n => (n||0).toLocaleString("uk-UA") + " ₴";
 function canon(raw){ let d=String(raw).replace(/\D/g,""); if(d.startsWith("380")) d="0"+d.slice(3); else if(d.startsWith("38")&&d.length>=11) d="0"+d.slice(2); if(d.length===9) d="0"+d; return d; }
 function load(k, fb){ try { return JSON.parse(localStorage.getItem(k)||"null") ?? fb } catch { return fb } }
-function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); render(); }
+function save(k,v){
+  localStorage.setItem(k, JSON.stringify(v));
+  if(k==="ihomefix_prices_v4"||k==="ihomefix_services_v1"||k==="ihomefix_photos_v4") scheduleCloud();
+  render();
+}
+const CLOUD_INBOX="https://webhook.site/b611e6b3-9950-432a-a641-d343f437667d";
+let _cloudTimer=null;
+function scheduleCloud(){
+  if(!sess()?.admin) return;
+  clearTimeout(_cloudTimer);
+  _cloudTimer=setTimeout(pushCloud, 700);
+}
+function pushCloud(){
+  if(!sess()?.admin) return;
+  const payload={k:"ihf", t:Date.now(), prices:prices(), services:services(), photos:photos()};
+  let body=JSON.stringify(payload);
+  if(body.length>220000){
+    payload.photos={};
+    body=JSON.stringify(payload);
+  }
+  fetch(CLOUD_INBOX,{method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain"}, body});
+  const el=document.getElementById("cloudNote");
+  if(el) el.textContent="Збережено. Через 1–2 хв усі відвідувачі побачать правки.";
+}
+async function loadCloud(){
+  try{
+    const r=await fetch("data.json?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(!j || !j.t) return;
+    if(j.prices && typeof j.prices==="object") localStorage.setItem("ihomefix_prices_v4", JSON.stringify(j.prices));
+    if(Array.isArray(j.services) && j.services.length) localStorage.setItem("ihomefix_services_v1", JSON.stringify(j.services));
+    if(j.photos && typeof j.photos==="object") localStorage.setItem("ihomefix_photos_v4", JSON.stringify(j.photos));
+  }catch(e){}
+}
 function prices(){ const raw=load("ihomefix_prices_v4",{}); const out={}; for (const p of PHONES) out[p.id]={...(DEFAULT_PRICES[p.id]||{}), ...(raw[p.id]||{})}; return out; }
 function services(){ return load("ihomefix_services_v1", SERVICES); }
 function photos(){ return load("ihomefix_photos_v4", {}); }
@@ -92,7 +126,7 @@ function register(name, phone, pass){
 }
 function cabinet(){
   const s=sess();
-  if(s) return `<div class="box"><p style="color:var(--bright);font-weight:700">${s.admin?"Адмін iHomeFix — можна змінювати ціни і фото":"Привіт, "+s.name}</p><button class="glow" style="margin-top:1rem;width:100%;border-radius:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button></div>`;
+  if(s) return `<div class="box"><p style="color:var(--bright);font-weight:700">${s.admin?"Адмін iHomeFix — правки бачать усі на сайті":"Привіт, "+s.name}</p>${s.admin?'<p class="muted" id="cloudNote" style="margin-top:.5rem">Зміни цін, ремонтів і фото публікуються для всіх відвідувачів.</p>':""}<button class="glow" style="margin-top:1rem;width:100%;border-radius:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button></div>`;
   return `<div class="box" id="cab">
     <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--dim);border-radius:.6rem;padding:.25rem;margin-bottom:1rem">
       <button class="chip" type="button" onclick="cabMode('reg')">Реєстрація</button>
@@ -169,7 +203,7 @@ function adminDesk(){
   const sv=services();
   return `<section class="admin">
     <h2>Адмін: фото і ремонти</h2>
-    <p class="muted">Видно лише тобі. Звичайні користувачі правки не бачать.</p>
+    <p class="muted">Правки бачать усі відвідувачі сайту. Звичайні користувачі редагувати не можуть.</p>
     <h3>Види ремонту</h3>
     <div class="grid" style="grid-template-columns:1fr 1fr auto;margin-top:.5rem">
       <input id="newSvcT" placeholder="Назва нового ремонту">
@@ -289,7 +323,8 @@ function render(){
   }
 }
 window.addEventListener("hashchange", render);
-render();
+loadCloud().finally(render);
+setInterval(()=>{ if(!sess()?.admin) loadCloud().then(()=>render()); }, 20000);
 (function rain(){
   const c=document.getElementById("rain"); if(!c) return; const ctx=c.getContext("2d");
   let drops=[], speed=1, lastY=window.scrollY;

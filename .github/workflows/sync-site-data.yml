@@ -1,0 +1,68 @@
+name: Publish iHomeFix site data
+on:
+  schedule:
+    - cron: "*/2 * * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [ihomefix-save]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull admin payload and write data.json
+        env:
+          DISPATCH_JSON: ${{ toJson(github.event.client_payload) }}
+        run: |
+          python3 << 'PY'
+          import json, os, urllib.request, pathlib
+          dest = pathlib.Path("docs/data.json")
+          payload = None
+          raw = os.environ.get("DISPATCH_JSON") or ""
+          try:
+              d = json.loads(raw)
+              if isinstance(d, dict) and d.get("t") and (d.get("prices") or d.get("services")):
+                  payload = d
+          except Exception:
+              pass
+          if payload is None:
+              url = "https://webhook.site/token/b611e6b3-9950-432a-a641-d343f437667d/requests?sorting=newest&per_page=5"
+              try:
+                  with urllib.request.urlopen(url, timeout=30) as r:
+                      body = json.loads(r.read().decode())
+                  rows = body.get("data") or []
+                  for row in rows:
+                      content = row.get("content") or ""
+                      try:
+                          d = json.loads(content)
+                      except Exception:
+                          continue
+                      if isinstance(d, dict) and d.get("k") == "ihf" and d.get("t"):
+                          payload = d
+                          break
+              except Exception as e:
+                  print("inbox error", e)
+          if not payload:
+              print("no payload")
+              raise SystemExit(0)
+          payload.pop("k", None)
+          try:
+              current = json.loads(dest.read_text())
+          except Exception:
+              current = {"t": 0}
+          if int(payload.get("t") or 0) <= int(current.get("t") or 0):
+              print("stale", payload.get("t"), current.get("t"))
+              raise SystemExit(0)
+          dest.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+          print("wrote", dest, "t=", payload.get("t"), "bytes", dest.stat().st_size)
+          PY
+      - name: Commit published data
+        run: |
+          git config user.name "iHomeFix"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data.json
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "Publish live site data"
+          git push
