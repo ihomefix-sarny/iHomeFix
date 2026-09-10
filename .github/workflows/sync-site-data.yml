@@ -78,6 +78,8 @@ jobs:
                   current["prices"] = d["prices"]
                   if isinstance(d.get("services"), list) and d["services"]:
                       current["services"] = d["services"]
+                  if isinstance(d.get("copy"), dict):
+                      current["copy"] = d["copy"]
                   current["t"] = t
                   changed = True
                   print("applied prices t", t)

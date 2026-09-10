@@ -56,6 +56,15 @@ const DEFAULT_PRICES = {
 const ADMIN_PHONE = "0678661083";
 const ADMIN_PASS = "Yakovets2002";
 const BAD = "неправильний логін або пароль";
+const DEFAULT_COPY = {
+  kicker:"Сарни · вул. Княгині Ольги, 40",
+  title:"Ремонт телефонів, планшетів, ноутбуків",
+  text:"Якісний ремонт ваших пристроїв. Швидка діагностика одразу на місці. Гарантія на всі види робіт.",
+  phone:"067 866 10 83",
+  models:"Моделі iPhone",
+  map:"Ми на карті",
+  address:"м. Сарни, вул. Княгині Ольги, 40"
+};
 
 function esc(s){
   return String(s ?? "").split('"').join("&#34;").split("<").join("&#60;");
@@ -83,7 +92,7 @@ function pushCloud(){
   if(!sess()?.admin) return;
   const t=Date.now();
   bumpRev(t);
-  postCloud({k:"ihf", t, prices:prices(), services:services()});
+  postCloud({k:"ihf", t, prices:prices(), services:services(), copy:copy()});
   const ph=photos();
   Object.keys(ph).forEach(id=>{
     const data=ph[id];
@@ -104,6 +113,7 @@ async function loadCloud(){
     if(cloudNewer){
       if(j.prices && typeof j.prices==="object") localStorage.setItem("ihomefix_prices_v4", JSON.stringify(j.prices));
       if(Array.isArray(j.services) && j.services.length) localStorage.setItem("ihomefix_services_v1", JSON.stringify(j.services));
+      if(j.copy && typeof j.copy==="object") localStorage.setItem("ihomefix_copy_v1", JSON.stringify(j.copy));
       bumpRev(j.t);
     }
     if(j.photos && typeof j.photos==="object"){
@@ -123,6 +133,7 @@ async function loadCloud(){
 function prices(){ const raw=load("ihomefix_prices_v4",{}); const out={}; for (const p of PHONES) out[p.id]={...(DEFAULT_PRICES[p.id]||{}), ...(raw[p.id]||{})}; return out; }
 function services(){ return load("ihomefix_services_v1", SERVICES); }
 function photos(){ return load("ihomefix_photos_v4", {}); }
+function copy(){ return {...DEFAULT_COPY, ...load("ihomefix_copy_v1", {})}; }
 function sess(){ return load("ihomefix_sess_v4", null); }
 function users(){ return load("ihomefix_users_v4", {}); }
 function loginAdmin(phone, pass){
@@ -217,14 +228,21 @@ window.updPrice=function(id,k,v){
   draft.prices[id]={...(draft.prices[id]||{}), [k]:Number(v)||0};
   dirtyNote();
 };
+window.updCopy=function(field, val){
+  if(!sess()?.admin) return;
+  ensureDraft();
+  draft.copy={...draft.copy, [field]:val};
+  dirtyNote();
+};
 let draft=null;
 function ensureDraft(){
   if(!sess()?.admin) return;
-  if(!draft) draft={ prices:JSON.parse(JSON.stringify(prices())), services:JSON.parse(JSON.stringify(services())), photos:{...photos()} };
+  if(!draft) draft={ prices:JSON.parse(JSON.stringify(prices())), services:JSON.parse(JSON.stringify(services())), photos:{...photos()}, copy:{...copy()} };
 }
 function viewServices(){ return (sess()?.admin && draft) ? draft.services : services(); }
 function viewPrices(){ return (sess()?.admin && draft) ? draft.prices : prices(); }
 function viewPhotos(){ return (sess()?.admin && draft) ? {...photos(), ...draft.photos} : photos(); }
+function viewCopy(){ return (sess()?.admin && draft) ? {...DEFAULT_COPY, ...draft.copy} : copy(); }
 function pic(id, fallback){ return viewPhotos()[id] || fallback; }
 function dirtyNote(){
   document.querySelectorAll(".save-admin").forEach(b=>{
@@ -249,11 +267,15 @@ window.commitAdmin=function(){
     draft.prices[id]=draft.prices[id]||{};
     draft.prices[id][k]=Number(el.value)||0;
   });
+  document.querySelectorAll("[data-copy]").forEach(el=>{
+    draft.copy[el.getAttribute("data-copy")]=el.value;
+  });
   const t=Date.now();
   bumpRev(t);
   localStorage.setItem("ihomefix_prices_v4", JSON.stringify(draft.prices));
   localStorage.setItem("ihomefix_services_v1", JSON.stringify(draft.services));
   localStorage.setItem("ihomefix_photos_v4", JSON.stringify({...photos(), ...draft.photos}));
+  localStorage.setItem("ihomefix_copy_v1", JSON.stringify({...DEFAULT_COPY, ...draft.copy}));
   draft=null;
   pushCloud();
   render();
@@ -274,7 +296,23 @@ function adminDesk(){
   </nav>`;
   let body="";
   if(tab==="all"){
-    body=`<h3>Види ремонту</h3>
+    const c=viewCopy();
+    body=`<h3>Тексти головної сторінки</h3>
+    <label>Короткий рядок зверху</label>
+    <input data-copy="kicker" value="${esc(c.kicker)}" oninput="updCopy('kicker',this.value)">
+    <label>Заголовок</label>
+    <input data-copy="title" value="${esc(c.title)}" oninput="updCopy('title',this.value)">
+    <label>Текст під заголовком</label>
+    <textarea data-copy="text" rows="4" style="width:100%;margin:.35rem 0 1rem;padding:.7rem;border-radius:.6rem;border:1px solid var(--line);background:var(--bg);color:var(--fg)" oninput="updCopy('text',this.value)">${esc(c.text)}</textarea>
+    <label>Текст кнопки телефону</label>
+    <input data-copy="phone" value="${esc(c.phone)}" oninput="updCopy('phone',this.value)">
+    <label>Заголовок блоку моделей</label>
+    <input data-copy="models" value="${esc(c.models)}" oninput="updCopy('models',this.value)">
+    <label>Заголовок карти</label>
+    <input data-copy="map" value="${esc(c.map)}" oninput="updCopy('map',this.value)">
+    <label>Адреса</label>
+    <input data-copy="address" value="${esc(c.address)}" oninput="updCopy('address',this.value)">
+    <h3>Види ремонту</h3>
     <div class="grid" style="grid-template-columns:1fr 1fr auto;margin-top:.5rem">
       <input id="newSvcT" placeholder="Назва нового ремонту">
       <input id="newSvcD" placeholder="Опис">
@@ -320,8 +358,8 @@ function adminDesk(){
 function footer(){
   return `<footer><div class="foot">
     <div><p style="font-family:Syne;font-weight:800;font-size:1.2rem;margin:0">iHome Fix</p>
-    <p class="muted" style="margin:.25rem 0 0">Сарни, вул. Княгині Ольги, 40<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора">.</button></p>
-    <a href="tel:+380678661083" style="color:var(--bright);font-weight:800">067 866 10 83</a></div>
+    <p class="muted" style="margin:.25rem 0 0">${esc(viewCopy().address)}<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора">.</button></p>
+    <a href="tel:+380678661083" style="color:var(--bright);font-weight:800">${esc(viewCopy().phone)}</a></div>
     <div class="row" style="flex-wrap:wrap">
       <a class="glow" href="https://instagram.com/ihome_fix" target="_blank" rel="noreferrer">Instagram</a>
       <a class="glow" href="https://www.tiktok.com/@ih0mefix" target="_blank" rel="noreferrer">TikTok</a>
@@ -330,13 +368,14 @@ function footer(){
     </div></div></footer>`;
 }
 function home(){
+  const c=viewCopy();
   return `<main>
     <section class="hero">
       <div>
-        <p class="pill">Сарни · вул. Княгині Ольги, 40</p>
-        <h1 style="font-size:clamp(1.8rem,4vw,3rem);margin-top:1rem">Ремонт телефонів, планшетів, ноутбуків</h1>
-        <p class="muted" style="font-size:1.1rem;margin-top:1rem">Якісний ремонт ваших пристроїв. Швидка діагностика одразу на місці. Гарантія на всі види робіт.</p>
-        <a class="glow" style="display:inline-flex;margin-top:1.5rem" href="tel:+380678661083">067 866 10 83</a>
+        <p class="pill">${esc(c.kicker)}</p>
+        <h1 style="font-size:clamp(1.8rem,4vw,3rem);margin-top:1rem">${esc(c.title)}</h1>
+        <p class="muted" style="font-size:1.1rem;margin-top:1rem">${esc(c.text)}</p>
+        <a class="glow" style="display:inline-flex;margin-top:1.5rem" href="tel:+380678661083">${esc(c.phone)}</a>
       </div>
       <div>
         <div class="card"><img src="${pic("hero","phones/hero-bench.jpg")}" alt="Ремонт" style="height:16rem;width:100%;object-fit:cover"></div>
@@ -344,18 +383,18 @@ function home(){
     </section>
     ${adminDesk()}
     <section style="margin-top:3rem">
-      <h2 style="font-size:1.8rem">Моделі iPhone</h2>
+      <h2 style="font-size:1.8rem">${esc(c.models)}</h2>
       <div class="grid" style="margin-top:1.25rem">
         ${PHONES.map(p=>`<a class="ph" href="#/m/${p.id}"><div class="stage"><img src="${pic(p.id,p.img)}" alt="${p.name}"></div><div class="pad"><p style="font-weight:800">${p.name}</p><p class="muted" style="font-size:.75rem">${p.color} · ${p.year}</p></div></a>`).join("")}
       </div>
     </section>
     <section style="margin-top:3rem;padding-bottom:2rem">
-      <h2 style="font-size:1.8rem">Ми на карті</h2>
+      <h2 style="font-size:1.8rem">${esc(c.map)}</h2>
       <div class="card" style="margin-top:1rem">
         <iframe title="Карта iHomeFix" style="height:20rem;width:100%;border:0" loading="lazy"
           src="https://maps.google.com/maps?q=%D0%A1%D0%B0%D1%80%D0%BD%D0%B8%20%D0%B2%D1%83%D0%BB.%20%D0%9A%D0%BD%D1%8F%D0%B3%D0%B8%D0%BD%D1%96%20%D0%9E%D0%BB%D1%8C%D0%B3%D0%B8%2040&hl=uk&z=17&output=embed"></iframe>
       </div>
-      <p class="muted" style="margin-top:.75rem">м. Сарни, вул. Княгині Ольги, 40<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора">.</button></p>
+      <p class="muted" style="margin-top:.75rem">${esc(c.address)}<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора">.</button></p>
     </section>
   </main>`+footer();
 }
