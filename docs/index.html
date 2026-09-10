@@ -23,6 +23,7 @@
     .word { font-family:Syne,sans-serif; font-weight:800; font-size:1.35rem }
     .logo { width:3.25rem; height:3.25rem; border-radius:999px; border:2px solid var(--fg); object-fit:cover; box-shadow:0 0 24px rgb(29 185 84 / .55) }
     .ico { width:2.25rem; height:2.25rem; display:grid; place-items:center; border-radius:999px; background:var(--dim); color:var(--fg) }
+    .ico svg { width:1.15rem; height:1.15rem; display:block }
     .row { display:flex; gap:.4rem; align-items:center }
     canvas.rain { position:fixed; inset:0; z-index:10; pointer-events:none }
     .side { position:fixed; top:6rem; z-index:11; width:12rem; pointer-events:none }
@@ -69,15 +70,15 @@
 <header class="bar">
   <div class="bar-in">
     <div class="row">
-      <a class="ico" href="https://instagram.com/ihome_fix" target="_blank" rel="noreferrer" aria-label="Instagram">IG</a>
-      <a class="ico" href="https://www.tiktok.com/@ih0mefix" target="_blank" rel="noreferrer" aria-label="TikTok">TT</a>
+      <a class="ico" href="https://instagram.com/ihome_fix" target="_blank" rel="noreferrer" aria-label="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
+      <a class="ico" href="https://www.tiktok.com/@ih0mefix" target="_blank" rel="noreferrer" aria-label="TikTok"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 3c.3 2.2 1.7 3.8 4 4.2V10a6.6 6.6 0 0 1-4-1.4v6.6A5.2 5.2 0 1 1 8.6 10v3.1a2.2 2.2 0 1 0 1.4 2.1V3H14Z"/></svg></a>
     </div>
     <div class="word" style="justify-self:end">iHome</div>
     <a href="#/"><img class="logo" src="logo.jpg" alt="iHomeFix"></a>
     <div class="word" style="justify-self:start">Fix</div>
     <div class="row" style="justify-self:end">
-      <a class="ico" href="viber://chat?number=%2B380678661083" aria-label="Viber">Vb</a>
-      <a class="ico" href="https://t.me/+380678661083" target="_blank" rel="noreferrer" aria-label="Telegram">Tg</a>
+      <a class="ico" href="viber://chat?number=%2B380678661083" aria-label="Viber"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.4 2 3.5 5.4 3.5 9.8c0 2.2 1 4.2 2.5 5.6L5 21.5 9.4 19c.8.2 1.7.3 2.6.3 4.6 0 8.5-3.4 8.5-7.8S16.6 2 12 2zm4.3 11.3c-.2.5-1 .9-1.4.9-.3.1-.7.2-2.2-.5-1.9-.8-3.1-2.5-3.2-2.6s-1-1.3-1-2.4.6-1.7.8-1.9c.2-.2.5-.3.6-.3h.5c.2 0 .4 0 .5.5l.8 1.8c.1.2 0 .4-.2.6l-.3.5c-.2.2-.3.4-.1.7.2.3.8 1.4 1.9 1.9.2.1.4 0 .6-.1l.5-.7c.2-.2.4-.2.6-.1l1.9.9c.3.1.4.3.3.5z"/></svg></a>
+      <a class="ico" href="https://t.me/+380678661083" target="_blank" rel="noreferrer" aria-label="Telegram"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.2 4.4 2.9 11.5c-1.2.5-1.2 1.1-.2 1.4l4.6 1.4 10.7-6.7c.5-.3.9-.1.6.2l-8.6 7.8-.3 4.5c.5 0 .7-.2 1-.5l2.4-2.3 4.9 3.6c.9.5 1.5.2 1.8-.8l3.2-15.2c.3-1.3-.5-1.9-1.8-1.5z"/></svg></a>
     </div>
   </div>
 </header>
@@ -150,40 +151,62 @@ function sess(){ return load("ihomefix_sess_v4", null); }
 function users(){ return load("ihomefix_users_v4", {}); }
 function login(phone, pass){
   const c=canon(phone);
-  if(c===ADMIN_PHONE && pass===ADMIN_PASS){ save("ihomefix_sess_v4", {name:"Адмін", phone:c, admin:true}); return ""; }
+  const p=String(pass||"");
+  if(c===ADMIN_PHONE && p===ADMIN_PASS){ save("ihomefix_sess_v4", {name:"Адмін", phone:c, admin:true}); return ""; }
   const u=Object.values(users()).find(x=>canon(x.phone)===c);
-  if(!u || u.password!==pass) return "Невірний логін або пароль";
+  if(!u || u.password!==p) return "Невірний логін або пароль";
   save("ihomefix_sess_v4", {name:u.name, phone:u.phone, admin:false}); return "";
 }
 function register(name, phone, pass){
   const c=canon(phone);
-  if(c===ADMIN_PHONE) return "Цей номер — адмін. Увійди через «Вхід».";
+  const p=String(pass||"");
+  if(c===ADMIN_PHONE) return login(phone, p) || "";
   if(c.length<10) return "Вкажи номер у форматі 067… або 380…";
   const all=users();
   if(Object.values(all).find(x=>canon(x.phone)===c)) return "Цей номер вже зареєстровано.";
-  all[c]={name, phone:c, password:pass}; localStorage.setItem("ihomefix_users_v4", JSON.stringify(all));
+  all[c]={name, phone:c, password:p}; localStorage.setItem("ihomefix_users_v4", JSON.stringify(all));
   save("ihomefix_sess_v4", {name, phone:c, admin:false}); return "";
 }
 function cabinet(){
   const s=sess();
-  if(s) return `<div class="box"><p style="color:var(--bright);font-weight:700">${s.admin?"Адмін iHomeFix — можна змінювати ціни":"Привіт, "+s.name}</p><button class="glow" style="margin-top:1rem;width:100%;border-radius:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button></div>`;
+  if(s) return `<div class="box"><p style="color:var(--bright);font-weight:700">${s.admin?"Адмін iHomeFix — можна змінювати ціни і фото":"Привіт, "+s.name}</p><button class="glow" style="margin-top:1rem;width:100%;border-radius:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button></div>`;
   return `<div class="box" id="cab">
     <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--dim);border-radius:.6rem;padding:.25rem;margin-bottom:1rem">
-      <button class="chip on" type="button" onclick="cabMode('reg')">Реєстрація</button>
-      <button class="chip" type="button" onclick="cabMode('log')">Вхід</button>
+      <button class="chip" type="button" onclick="cabMode('reg')">Реєстрація</button>
+      <button class="chip on" type="button" onclick="cabMode('log')">Вхід</button>
     </div>
     <form onsubmit="return cabSubmit(event)">
-      <div id="cabName"><label>Ім’я</label><input name="name" required></div>
-      <label>Телефон (067… або 380…)</label><input name="phone" required>
-      <label>Пароль</label><input name="password" type="password" required minlength="4">
+      <div id="cabName" style="display:none"><label>Ім’я</label><input name="name"></div>
+      <label>Телефон (067… або 380…)</label><input name="phone" required placeholder="0678661083" autocomplete="username">
+      <label>Пароль</label><input name="password" type="password" required minlength="4" autocomplete="current-password">
       <p class="err" id="cabErr"></p>
-      <button class="glow" style="margin-top:.75rem;width:100%;border-radius:.6rem" type="submit">Створити кабінет</button>
+      <button class="glow" style="margin-top:.75rem;width:100%;border-radius:.6rem" type="submit">Увійти</button>
     </form>
   </div>`;
 }
-let _mode="reg";
-window.cabMode=function(m){ _mode=m; const f=document.querySelector("#cab form"); if(!f) return; f.querySelector("#cabName").style.display=m==="reg"?"":"none"; f.querySelector("button[type=submit]").textContent=m==="reg"?"Створити кабінет":"Увійти"; [...document.querySelectorAll("#cab .chip")].forEach((b,i)=>b.classList.toggle("on",(m==="reg"?0:1)===i)); };
-window.cabSubmit=function(e){ e.preventDefault(); const fd=new FormData(e.target); const err=_mode==="reg"?register(fd.get("name"),fd.get("phone"),fd.get("password")):login(fd.get("phone"),fd.get("password")); const el=document.getElementById("cabErr"); if(el) el.textContent=err; return false; };
+let _mode="log";
+window.cabMode=function(m){
+  _mode=m;
+  const f=document.querySelector("#cab form");
+  if(!f) return;
+  const nameBox=f.querySelector("#cabName");
+  const nameInp=f.querySelector("[name=name]");
+  if(nameBox) nameBox.style.display=m==="reg"?"":"none";
+  if(nameInp){ nameInp.required=m==="reg"; nameInp.disabled=m!=="reg"; }
+  f.querySelector("button[type=submit]").textContent=m==="reg"?"Створити кабінет":"Увійти";
+  [...document.querySelectorAll("#cab .chip")].forEach((b,i)=>b.classList.toggle("on",(m==="reg"?0:1)===i));
+};
+window.cabSubmit=function(e){
+  e.preventDefault();
+  const fd=new FormData(e.target);
+  const phone=String(fd.get("phone")||"").trim();
+  const pass=String(fd.get("password")||"");
+  const name=String(fd.get("name")||"").trim();
+  const err=_mode==="reg"?register(name, phone, pass):login(phone, pass);
+  const el=document.getElementById("cabErr");
+  if(el) el.textContent=err;
+  return false;
+};
 function footer(){
   return `<footer><div class="foot">
     <div><p style="font-family:Syne;font-weight:800;font-size:1.2rem;margin:0">iHome Fix</p>
