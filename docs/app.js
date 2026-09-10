@@ -374,7 +374,6 @@ function model(id){
         <p style="color:var(--bright);font-size:.75rem;font-weight:800;letter-spacing:.12em">${p.year}</p>
         <h1 style="font-size:2.2rem;margin-top:.25rem">${p.name}</h1>
         <p class="muted" style="letter-spacing:.18em;font-size:.75rem;text-transform:uppercase">made in california</p>
-        <p class="muted">${p.color} · ${p.note}</p>
         <a class="glow" style="display:inline-flex;margin-top:1.5rem" href="tel:+380678661083">Записатись · 067 866 10 83</a>
       </div>
     </section>
