@@ -104,61 +104,47 @@ function photos(){ return load("ihomefix_photos_v4", {}); }
 function pic(id, fallback){ return photos()[id] || fallback; }
 function sess(){ return load("ihomefix_sess_v4", null); }
 function users(){ return load("ihomefix_users_v4", {}); }
-function login(phone, pass){
+function loginAdmin(phone, pass){
   const c=canon(phone);
   const p=String(pass||"");
-  if(!c || !p) return BAD;
   if(c===ADMIN_PHONE && p===ADMIN_PASS){ save("ihomefix_sess_v4", {name:"Адмін", phone:c, admin:true}); return ""; }
-  const u=Object.values(users()).find(x=>canon(x.phone)===c);
-  if(!u || u.password!==p) return BAD;
-  save("ihomefix_sess_v4", {name:u.name, phone:u.phone, admin:false}); return "";
+  return BAD;
 }
-function register(name, phone, pass){
-  const c=canon(phone);
-  const p=String(pass||"");
-  if(c===ADMIN_PHONE) return login(phone, p);
-  if(!c || !p) return BAD;
-  if(c.length<10) return BAD;
-  const all=users();
-  if(Object.values(all).find(x=>canon(x.phone)===c)) return BAD;
-  all[c]={name:name||"Клієнт", phone:c, password:p}; localStorage.setItem("ihomefix_users_v4", JSON.stringify(all));
-  save("ihomefix_sess_v4", {name:name||"Клієнт", phone:c, admin:false}); return "";
-}
-function cabinet(){
-  const s=sess();
-  if(s) return `<div class="box"><p style="color:var(--bright);font-weight:700">${s.admin?"Адмін iHomeFix — правки бачать усі на сайті":"Привіт, "+s.name}</p>${s.admin?'<p class="muted" id="cloudNote" style="margin-top:.5rem">Зміни цін, ремонтів і фото публікуються для всіх відвідувачів.</p>':""}<button class="glow" style="margin-top:1rem;width:100%;border-radius:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button></div>`;
-  return `<div class="box" id="cab">
-    <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--dim);border-radius:.6rem;padding:.25rem;margin-bottom:1rem">
-      <button class="chip" type="button" onclick="cabMode('reg')">Реєстрація</button>
-      <button class="chip on" type="button" onclick="cabMode('log')">Вхід</button>
-    </div>
-    <form onsubmit="return cabSubmit(event)">
-      <div id="cabName" style="display:none"><label>Ім’я</label><input name="name" placeholder="введіть ім’я"></div>
-      <label>Логін</label><input name="phone" placeholder="введіть логін" autocomplete="username">
-      <label>Пароль</label><input name="password" type="password" placeholder="введіть пароль" autocomplete="current-password">
-      <p class="err" id="cabErr"></p>
-      <button class="glow" style="margin-top:.75rem;width:100%;border-radius:.6rem" type="submit">Увійти</button>
-    </form>
-  </div>`;
-}
-let _mode="log";
-window.cabMode=function(m){
-  _mode=m;
-  const f=document.querySelector("#cab form");
-  if(!f) return;
-  const nameBox=f.querySelector("#cabName");
-  if(nameBox) nameBox.style.display=m==="reg"?"":"none";
-  f.querySelector("button[type=submit]").textContent=m==="reg"?"Створити кабінет":"Увійти";
-  [...document.querySelectorAll("#cab .chip")].forEach((b,i)=>b.classList.toggle("on",(m==="reg"?0:1)===i));
+window.openAdmin=function(){
+  const u=new URL(location.href);
+  u.hash="#/admin";
+  const w=window.open(u.toString(),"ihomefix-admin","popup=yes,width=440,height=640,scrollbars=yes,resizable=yes");
+  if(!w) location.hash="#/admin";
 };
-window.cabSubmit=function(e){
+window.adminSubmit=function(e){
   e.preventDefault();
   const fd=new FormData(e.target);
-  const err=_mode==="reg"?register(String(fd.get("name")||"").trim(), String(fd.get("phone")||"").trim(), String(fd.get("password")||"")):login(String(fd.get("phone")||"").trim(), String(fd.get("password")||""));
-  const el=document.getElementById("cabErr");
+  const err=loginAdmin(String(fd.get("phone")||"").trim(), String(fd.get("password")||""));
+  const el=document.getElementById("adminErr");
   if(el) el.textContent=err;
   return false;
 };
+function adminGate(){
+  const s=sess();
+  if(s?.admin){
+    return `<main><section class="box" style="margin:2rem 0">
+      <p class="pill">Це вікно тільки для адміністратора</p>
+      <h1 style="margin-top:1rem">Вхід адміністратора</h1>
+      <p class="muted" id="cloudNote" style="margin-top:.75rem">Ви в системі. Правки з’являться на сайті для всіх.</p>
+      <button class="chip" style="margin-top:1rem" type="button" onclick="save('ihomefix_sess_v4',null)">Вийти</button>
+    </section>${adminDesk()}</main>`;
+  }
+  return `<main><section class="box" style="margin:2rem 0">
+    <p class="pill">Це вікно тільки для адміністратора</p>
+    <h1 style="margin-top:1rem">Вхід адміністратора</h1>
+    <form onsubmit="return adminSubmit(event)" style="margin-top:1.25rem">
+      <label>Логін</label><input name="phone" placeholder="логін" autocomplete="username">
+      <label>Пароль</label><input name="password" type="password" placeholder="пароль" autocomplete="current-password">
+      <p class="err" id="adminErr"></p>
+      <button class="glow" style="margin-top:.75rem;width:100%;border-radius:.6rem" type="submit">Увійти</button>
+    </form>
+  </section></main>`;
+}
 function compress(file, cb){
   const img=new Image();
   const url=URL.createObjectURL(file);
@@ -204,6 +190,7 @@ function adminDesk(){
   return `<section class="admin">
     <h2>Адмін: фото і ремонти</h2>
     <p class="muted">Правки бачать усі відвідувачі сайту. Звичайні користувачі редагувати не можуть.</p>
+    <button class="chip" type="button" style="margin-top:.6rem" onclick="save('ihomefix_sess_v4',null)">Вийти</button>
     <h3>Види ремонту</h3>
     <div class="grid" style="grid-template-columns:1fr 1fr auto;margin-top:.5rem">
       <input id="newSvcT" placeholder="Назва нового ремонту">
@@ -249,7 +236,6 @@ function home(){
       </div>
       <div>
         <div class="card"><img src="${pic("hero","phones/hero-bench.jpg")}" alt="Ремонт" style="height:16rem;width:100%;object-fit:cover"></div>
-        <div style="margin-top:1rem">${cabinet()}</div>
       </div>
     </section>
     ${adminDesk()}
@@ -262,11 +248,11 @@ function home(){
     </section>
     <section style="margin-top:3rem;padding-bottom:2rem">
       <h2 style="font-size:1.8rem">Ми на карті</h2>
-      <p class="muted">м. Сарни, вул. Княгині Ольги, 40</p>
       <div class="card" style="margin-top:1rem">
         <iframe title="Карта iHomeFix" style="height:20rem;width:100%;border:0" loading="lazy"
           src="https://maps.google.com/maps?q=%D0%A1%D0%B0%D1%80%D0%BD%D0%B8%20%D0%B2%D1%83%D0%BB.%20%D0%9A%D0%BD%D1%8F%D0%B3%D0%B8%D0%BD%D1%96%20%D0%9E%D0%BB%D1%8C%D0%B3%D0%B8%2040&hl=uk&z=17&output=embed"></iframe>
       </div>
+      <p class="muted" style="margin-top:.75rem">м. Сарни, вул. Княгині Ольги, 40<button class="admin-dot" type="button" onclick="openAdmin()" title="Вхід адміністратора" aria-label="Вхід адміністратора"></button></p>
     </section>
   </main>`+footer();
 }
@@ -287,7 +273,6 @@ function model(id){
         <p class="muted" style="letter-spacing:.18em;font-size:.75rem;text-transform:uppercase">made in california</p>
         <p class="muted">${p.color} · ${p.note}</p>
         <a class="glow" style="display:inline-flex;margin-top:1.5rem" href="tel:+380678661083">Записатись · 067 866 10 83</a>
-        <div style="margin-top:1.5rem">${cabinet()}</div>
       </div>
     </section>
     <section style="margin-top:2.5rem;padding-bottom:2rem">
@@ -311,6 +296,12 @@ function model(id){
 function render(){
   try {
     const h=location.hash.slice(1) || "/";
+    if(h==="/admin" || h.startsWith("/admin")){
+      document.body.classList.add("admin-win");
+      document.getElementById("app").innerHTML = adminGate();
+      return;
+    }
+    document.body.classList.remove("admin-win");
     const m=h.match(/^\/m\/([\w]+)/);
     document.getElementById("app").innerHTML = m ? model(m[1]) : home();
     const L=document.getElementById("sideL");
@@ -323,6 +314,7 @@ function render(){
   }
 }
 window.addEventListener("hashchange", render);
+window.addEventListener("storage", ()=>render());
 loadCloud().finally(render);
 setInterval(()=>{ if(!sess()?.admin) loadCloud().then(()=>render()); }, 20000);
 (function rain(){
