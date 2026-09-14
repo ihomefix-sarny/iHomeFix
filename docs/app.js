@@ -110,11 +110,11 @@ async function loadCloud(){
     const localT=rev();
     const admin=!!sess()?.admin;
     const cloudNewer = j.t > localT;
-    if(cloudNewer){
+    if(!admin || cloudNewer){
       if(j.prices && typeof j.prices==="object") localStorage.setItem("ihomefix_prices_v4", JSON.stringify(j.prices));
       if(Array.isArray(j.services) && j.services.length) localStorage.setItem("ihomefix_services_v1", JSON.stringify(j.services));
       if(j.copy && typeof j.copy==="object") localStorage.setItem("ihomefix_copy_v1", JSON.stringify(j.copy));
-      bumpRev(j.t);
+      bumpRev(Math.max(j.t, localT));
     }
     if(j.photos && typeof j.photos==="object"){
       const cur=load("ihomefix_photos_v4",{});
