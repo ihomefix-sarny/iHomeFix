@@ -7,10 +7,10 @@ const SERVICES = [
   {k:"port", t:"Роз’єм зарядки", d:"Lightning / USB-C."},
 ];
 const PHONES = [
-  ["x","iPhone X","2017","Space Gray","phones/x.jpg","2 камери вертикально"],
+  ["x","iPhone X","2017","Space Gray","phones/x.jpg?v=17","2 камери вертикально"],
   ["xr","iPhone XR","2018","Coral","phones/xr.jpg","1 камера"],
-  ["xs","iPhone XS","2018","Gold","phones/xs.jpg","2 камери, OLED"],
-  ["xsm","iPhone XS Max","2018","Gold","phones/xsm.jpg","6.5″ OLED, 2 камери"],
+  ["xs","iPhone XS","2018","Gold","phones/xs.jpg?v=17","2 камери, OLED"],
+  ["xsm","iPhone XS Max","2018","Gold","phones/xsm.jpg?v=17","6.5″ OLED, 2 камери"],
   ["11","iPhone 11","2019","Green","phones/11.jpg","квадрат, 2 камери"],
   ["11p","iPhone 11 Pro","2019","Midnight Green","phones/11p.jpg","3 камери + спалах"],
   ["11pm","iPhone 11 Pro Max","2019","Midnight Green","phones/11pm.jpg","3 камери, 6.5″"],
