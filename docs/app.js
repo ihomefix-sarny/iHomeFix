@@ -60,6 +60,7 @@ const DEFAULT_COPY = {
   kicker:"Сарни · вул. Княгині Ольги, 40",
   title:"Ремонт телефонів, планшетів, ноутбуків",
   text:"Якісний ремонт ваших пристроїв. Швидка діагностика одразу на місці. Гарантія на всі види робіт.",
+  sub:"Ціни на ремонт android, планшети, ноутбуки можна дізнатися за номером телефоні або в соц. мережах.",
   phone:"067 866 10 83",
   models:"Моделі iPhone",
   map:"Ми на карті",
@@ -305,6 +306,8 @@ function adminDesk(){
     <input data-copy="title" value="${esc(c.title)}" oninput="updCopy('title',this.value)">
     <label>Текст під заголовком</label>
     <textarea data-copy="text" rows="4" style="width:100%;margin:.35rem 0 1rem;padding:.7rem;border-radius:.6rem;border:1px solid var(--line);background:var(--bg);color:var(--fg)" oninput="updCopy('text',this.value)">${esc(c.text)}</textarea>
+    <label>Дрібний текст під описом</label>
+    <textarea data-copy="sub" rows="2" style="width:100%;margin:.35rem 0 1rem;padding:.7rem;border-radius:.6rem;border:1px solid var(--line);background:var(--bg);color:var(--fg)" oninput="updCopy('sub',this.value)">${esc(c.sub||"")}</textarea>
     <label>Текст кнопки телефону</label>
     <input data-copy="phone" value="${esc(c.phone)}" oninput="updCopy('phone',this.value)">
     <label>Заголовок блоку моделей</label>
@@ -376,10 +379,11 @@ function home(){
         <p class="pill">${esc(c.kicker)}</p>
         <h1 style="font-size:clamp(1.8rem,4vw,3rem);margin-top:1rem">${esc(c.title)}</h1>
         <p class="muted" style="font-size:1.1rem;margin-top:1rem">${esc(c.text)}</p>
+        <p class="muted" style="font-size:.88rem;margin-top:.7rem;max-width:32rem;opacity:.85">${esc(c.sub||"")}</p>
         <a class="glow" style="display:inline-flex;margin-top:1.5rem" href="tel:+380678661083">${esc(c.phone)}</a>
       </div>
       <div>
-        <div class="card"><img src="${pic("hero","phones/hero-bench.jpg")}" alt="Ремонт" style="height:16rem;width:100%;object-fit:cover"></div>
+        <div class="card"><img src="${pic("hero","phones/hero-bench.jpg")}" alt="iHomeFix" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:center"></div>
       </div>
     </section>
     ${adminDesk()}
