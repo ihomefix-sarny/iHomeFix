@@ -90,6 +90,8 @@ jobs:
               pid, val, t = d.get("id"), d.get("data"), int(d.get("t") or 0)
               if not pid or not val:
                   continue
+              if str(pid) == "hero":
+                  continue
               prev = latest_photo.get(pid)
               if not prev or t >= prev[0]:
                   latest_photo[pid] = (t, val)
@@ -102,6 +104,8 @@ jobs:
                   print("photo", pid, rel)
           # never keep giant data-URLs in data.json
           for pid, val in list(current["photos"].items()):
+              if pid == "hero":
+                  continue
               if isinstance(val, str) and val.startswith("data:image"):
                   rel = save_data_url(pid, val)
                   if rel:

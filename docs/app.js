@@ -383,7 +383,7 @@ function home(){
         <a class="glow" style="display:inline-flex;margin-top:1.5rem" href="tel:+380678661083">${esc(c.phone)}</a>
       </div>
       <div>
-        <div class="card"><img src="${pic("hero","phones/hero-bench.jpg")}" alt="iHomeFix" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:center"></div>
+        <div class="card"><img src="phones/hero-bench.jpg?v=20" alt="iHomeFix" style="width:100%;aspect-ratio:4/3;object-fit:cover;object-position:center"></div>
       </div>
     </section>
     ${adminDesk()}
